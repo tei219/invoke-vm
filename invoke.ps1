@@ -1,4 +1,4 @@
-#Import-Module VMware.VimAutomation.Core
+
 
 # invoke.ps1 target|list [cmdset] [viserver] [user] [password] [credential] [pswdmaster] [continue]
 Param( 
@@ -58,6 +58,7 @@ if ( (test-path $target) ) {
 # set logname
 $logname = join-path $result_dir "$ymd.log"
 
+# Import-Module VMware.VimAutomation.Core
 
 if (-not [string]::IsNullOrEmpty($credential)){
     Connect-VIServer -Server $viserver -Credential $credential -Force
@@ -89,5 +90,6 @@ write-output "cmdset: $cmdset"
 write-output "is_list: $is_list"
 write-output "result_dir: $result_dir"
 write-output "logname: $logname"
+write-output "viserver: $viserver"
 write-output "user: $user"
 write-output "password: $password"

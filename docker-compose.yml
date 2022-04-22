@@ -3,10 +3,11 @@ version: "3"
 services:
         esxi:
                 container_name: esxi
-                image: nimmis/vcsim
+                image: vmware/vcsim
                 tty: true
                 ports:
-                 - "443:443"
+                  - "443:443"
+                command: ["/vcsim","-l","0.0.0.0:443"]
         pwsh: 
                 container_name: pwsh
                 image: vmware/powerclicore
