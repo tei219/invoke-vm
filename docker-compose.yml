@@ -1,0 +1,19 @@
+version: "3"
+
+services:
+        esxi:
+                container_name: esxi
+                image: nimmis/vcsim
+                tty: true
+                ports:
+                 - "443:443"
+        pwsh: 
+                container_name: pwsh
+                image: vmware/powerclicore
+                tty: true
+                entrypoint: ["/usr/bin/pwsh"]
+                volumes:
+                  - ./:/root/invoke
+                working_dir: /root/invoke
+                profiles: 
+                  - extra
