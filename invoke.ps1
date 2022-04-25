@@ -71,7 +71,7 @@ if (-not [string]::IsNullOrEmpty($credential)){
 }
 
 ## connected VIServer
-
+#get-vmhost 
 get-vm | select name
 
 
