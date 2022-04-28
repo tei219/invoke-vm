@@ -8,14 +8,43 @@ Param(
     $credential ,
     [string]$pswdmaster = "pswdmaster.txt",
     [boolean]$continue = $false
-    )
+)
 
 ###############################
+function mkpswdlist{
+    param($pswdmaster)
+    $pswdlist = @()
+    foreach ($line in $(get-content $pswdmaster | select-string -pattern "^//" -notmatch)){
+        $buf = @{}
+        $buf += ConvertFrom-StringData("vm="+ $line.line.split("`t")[0])
+        $buf += ConvertFrom-StringData("user="+ $line.line.split("`t")[1])
+        $buf += ConvertFrom-StringData("password="+ $line.line.split("`t")[2])
+        $pswdlist += $buf
+    }
+    return $($(convertto-json $pswdlist) | convertfrom-json)
+}
+
 function invoker{
-    param($vm, $cmd, $pswdmaster)
-    write-output "invoker $vm $cmd $pswdmaster"
-    $a = $(select-string $pswdmaster -Pattern "^$vm").line.split("`t")
-    $a | convertto-json
+    param($vm, $cmd, $pswdlist)
+
+    # get credential
+    try{
+        $pswd = $pswdlist.where({$_.vm -eq $vm})
+    }catch{
+        try{
+            $pswd = $pswdlist.where({$_.vm -eq "default"})
+        }catch{
+            write-output "missing password error"
+            exit;
+        }
+    }
+
+    # invoke command
+    try{
+        invoke-vmscript -vm $vm -scripttext $(get-content $cmd -raw) -guestuser $pswd.user -guestpassword $pswd.password
+    }catch{
+        $_.Exception.Message
+    }
 }
 ##############################
 
@@ -28,13 +57,13 @@ foreach ($dirname in ("list.d","result.d","cmd.d")){
 if ( -not ( test-path $pswdmaster)){
     write-output "missing password master file: $pswdmaster, create it."
     exit
+}else{
+    $pswdlist = mkpswdlist -pswdmaster $pswdmaster
 }
- {"vm": "default", "user": "root", "password": "pass"} | convertto-json
 
 if (-not (test-path $cmdset) ) {
     if (test-path "cmd.d/$cmdset"){
         $cmdset = resolve-path (join-path "cmd.d" $cmdset)
-        
     }else{
         write-output "missing command set: $cmdset, create it."
         exit
@@ -69,39 +98,40 @@ if ( (test-path $target) ) {
 # set logname
 $logname = join-path $result_dir "$ymd.log"
 
-# set default guestuser/password
-#select-pswd -pswdmaster $pswdmaster
-
 # Import-Module VMware.VimAutomation.Core
 
 if (-not [string]::IsNullOrEmpty($credential)){
-#    Connect-VIServer -Server $viserver -Credential $credential -Force
+    Connect-VIServer -Server $viserver -Credential $credential -Force
 }else{
     if (([string]::IsNullOrEmpty($viuser)) -or ([string]::IsNullOrEmpty($vipassword))){
         $viuser = read-host "viUser"
         $vipassword = read-host "viPassword"
     }
-#    Connect-VIServer -Server $viserver -User $viuser -Password $vipassword -Force
+    Connect-VIServer -Server $viserver -User $viuser -Password $vipassword -Force
 }
 
 ## connected VIServer
 
-# commander#1
 if ( -not $is_list ){
     $lists = @($target)
 }else{
     $lists = get-content $list
 }
 
-#tartget is list
+# list > cmd 
 foreach ($vm in $lists){
     foreach ($cmd in (get-childitem $cmdset -exclude "@*")){
         echo "$vm $cmd"
-        # call invoker
-        invoker -vm $vm -cmd $cmd -pswdmaster $pswdmaster
+        try{
+            $vmspec = get-vm $vm
+            # call invoker
+            invoker -vm $vm -cmd $cmd -pswdlist $pswdlist
+        }catch{
+            $_.Exception.Message
+        }
     }
 }
 
 
 ## end of connection
-#Disconnect-VIServer -Server $viserver -Confirm:$false
+Disconnect-VIServer -Server $viserver -Confirm:$false
